@@ -1,5 +1,5 @@
 import { createContext, useState, useContext } from 'react';
-import toast from 'react-hot-toast'; // Import the Toast library
+import toast from 'react-hot-toast'; 
 
 const CartContext = createContext();
 
@@ -9,22 +9,17 @@ export function CartProvider({ children }) {
   // --- ADD TO CART (With Quantity) ---
   const addToCart = (product, quantity = 1) => {
     setCart((prevCart) => {
-      // Check if item is already in the cart
       const existingItem = prevCart.find((item) => item._id === product._id);
       
       if (existingItem) {
-        // If it exists, just update the quantity
-        // (Old Qty + New Qty)
         return prevCart.map((item) =>
           item._id === product._id ? { ...item, qty: item.qty + quantity } : item
         );
       } else {
-        // If it's new, add it to the list with the chosen quantity
         return [...prevCart, { ...product, qty: quantity }];
       }
     });
 
-    // Show Success Notification
     toast.success(`Added ${quantity} ${product.name} to Cart! 🛒`, {
       style: {
         borderRadius: '10px',
@@ -38,7 +33,6 @@ export function CartProvider({ children }) {
   const removeFromCart = (id) => {
     setCart((prevCart) => prevCart.filter((item) => item._id !== id));
     
-    // Show Remove Notification
     toast.error("Item removed from Cart", {
       style: {
         borderRadius: '10px',
@@ -53,8 +47,14 @@ export function CartProvider({ children }) {
     return cart.reduce((total, item) => total + item.price * item.qty, 0);
   };
 
+  // --- NEW: CLEAR ENTIRE CART (Used after successful checkout) ---
+  const clearCart = () => {
+    setCart([]); // Simply resets the cart array to be empty
+  };
+
   return (
-    <CartContext.Provider value={{ cart, addToCart, removeFromCart, getTotalPrice }}>
+    // Make sure clearCart is added to the value object here!
+    <CartContext.Provider value={{ cart, addToCart, removeFromCart, getTotalPrice, clearCart }}>
       {children}
     </CartContext.Provider>
   );

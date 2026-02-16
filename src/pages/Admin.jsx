@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Trash2, ToggleLeft, ToggleRight, PlusCircle, Package, Edit2, X } from 'lucide-react';
+import { Trash2, ToggleLeft, ToggleRight, PlusCircle, Package, Edit2, X, ClipboardList } from 'lucide-react'; // Added ClipboardList icon
 
 export default function Admin() {
   // --- STATE MANAGEMENT ---
@@ -7,10 +7,11 @@ export default function Admin() {
   const [password, setPassword] = useState('');
   
   const [products, setProducts] = useState([]);
-  const [activeTab, setActiveTab] = useState('list'); // 'list' or 'add'
+  const [orders, setOrders] = useState([]); // NEW: State to hold orders
+  const [activeTab, setActiveTab] = useState('list'); // 'list', 'orders', or 'add'
   
   // Edit Mode State
-  const [editingId, setEditingId] = useState(null); // If null, we are adding. If ID, we are editing.
+  const [editingId, setEditingId] = useState(null); 
 
   // Form State
   const [formData, setFormData] = useState({ 
@@ -18,17 +19,31 @@ export default function Admin() {
   });
   const [file, setFile] = useState(null);
 
+  // Dynamic Backend URL (Works locally and live)
+  const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
   // --- API FUNCTIONS ---
 
   const fetchProducts = () => {
-    fetch('https://bikestore-api-tzvs.onrender.com/api/products')
+    fetch(`${backendUrl}/api/products`)
       .then(res => res.json())
       .then(data => setProducts(data))
       .catch(err => console.error("Error fetching products:", err));
   };
 
+  // NEW: Fetch Orders
+  const fetchOrders = () => {
+    fetch(`${backendUrl}/api/orders`)
+      .then(res => res.json())
+      .then(data => setOrders(data))
+      .catch(err => console.error("Error fetching orders:", err));
+  };
+
   useEffect(() => {
-    if (isAuthenticated) fetchProducts();
+    if (isAuthenticated) {
+      fetchProducts();
+      fetchOrders(); // Fetch orders when admin logs in
+    }
   }, [isAuthenticated]);
 
   const handleLogin = () => {
@@ -36,50 +51,51 @@ export default function Admin() {
     else alert('❌ Wrong Password!');
   };
 
+  // NEW: Update Order Status
+  const handleUpdateOrderStatus = async (orderId, newStatus) => {
+    try {
+      const response = await fetch(`${backendUrl}/api/orders/${orderId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (response.ok) {
+        fetchOrders(); // Refresh the list to show the new status
+      } else {
+        alert("Failed to update status");
+      }
+    } catch (error) {
+      console.error("Error updating order status:", error);
+    }
+  };
+
   // --- FORM HANDLERS ---
+  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleFileChange = (e) => setFile(e.target.files[0]);
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleFileChange = (e) => {
-    setFile(e.target.files[0]);
-  };
-
-  // 1. START EDITING
   const handleEdit = (product) => {
     setEditingId(product._id);
     setFormData({
-      name: product.name,
-      price: product.price,
-      category: product.category,
-      compatibility: product.compatibility,
-      description: product.description
+      name: product.name, price: product.price, category: product.category,
+      compatibility: product.compatibility, description: product.description
     });
-    setActiveTab('add'); // Switch to form view
-    // Note: We cannot pre-fill the file input for security reasons
+    setActiveTab('add'); 
   };
 
-  // 2. CANCEL EDITING
   const resetForm = () => {
     setEditingId(null);
     setFormData({ name: '', price: '', category: 'Engine', compatibility: '', description: '' });
     setFile(null);
-    document.getElementById('fileInput').value = "";
+    const fileInput = document.getElementById('fileInput');
+    if(fileInput) fileInput.value = "";
   };
 
-  // 3. SUBMIT (Decides whether to Create or Update)
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    // If adding new, image is required. If editing, image is optional.
-    if (!editingId && !file) {
-      alert("Please select an image file!");
-      return;
-    }
+    if (!editingId && !file) return alert("Please select an image file!");
 
     const data = new FormData();
-    if (file) data.append('image', file); // Only append if a new file exists
+    if (file) data.append('image', file); 
     data.append('name', formData.name);
     data.append('price', formData.price);
     data.append('category', formData.category);
@@ -87,12 +103,11 @@ export default function Admin() {
     data.append('description', formData.description);
 
     try {
-      let url = 'https://bikestore-api-tzvs.onrender.com/api/products';
+      let url = `${backendUrl}/api/products`;
       let method = 'POST';
 
-      // IF EDITING, CHANGE URL AND METHOD
       if (editingId) {
-        url = `https://bikestore-api-tzvs.onrender.com/api/products/${editingId}`;
+        url = `${backendUrl}/api/products/${editingId}`;
         method = 'PUT';
       }
 
@@ -114,18 +129,17 @@ export default function Admin() {
 
   const handleDelete = async (id) => {
     if (confirm("Are you sure you want to delete this product?")) {
-      await fetch(`https://bikestore-api-tzvs.onrender.com/api/products/${id}`, { method: 'DELETE' });
+      await fetch(`${backendUrl}/api/products/${id}`, { method: 'DELETE' });
       fetchProducts();
     }
   };
 
   const handleToggleStock = async (id) => {
-    await fetch(`https://bikestore-api-tzvs.onrender.com/api/products/${id}/toggle`, { method: 'PUT' });
+    await fetch(`${backendUrl}/api/products/${id}/toggle`, { method: 'PUT' });
     fetchProducts();
   };
 
   // --- RENDER ---
-  
   if (!isAuthenticated) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-900">
@@ -147,15 +161,85 @@ export default function Admin() {
         <button onClick={() => setIsAuthenticated(false)} className="text-red-600 font-bold">Logout</button>
       </div>
 
+      {/* --- TAB NAVIGATION --- */}
       <div className="flex gap-4 mb-6">
         <button onClick={() => { setActiveTab('list'); resetForm(); }} className={`px-6 py-2 rounded-full font-bold transition ${activeTab === 'list' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600'}`}>
           Manage Products
         </button>
+        
+        {/* NEW: Orders Tab Button */}
+        <button onClick={() => { setActiveTab('orders'); resetForm(); }} className={`px-6 py-2 rounded-full font-bold flex items-center gap-2 transition ${activeTab === 'orders' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600'}`}>
+          <ClipboardList size={18} /> Manage Orders
+        </button>
+
         <button onClick={() => { setActiveTab('add'); resetForm(); }} className={`px-6 py-2 rounded-full font-bold flex items-center gap-2 transition ${activeTab === 'add' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600'}`}>
           <PlusCircle size={18} /> {editingId ? 'Edit Product' : 'Add New Product'}
         </button>
       </div>
 
+      {/* --- TAB CONTENT: ORDERS --- */}
+      {activeTab === 'orders' && (
+        <div className="bg-white rounded-lg shadow overflow-x-auto border">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-gray-100 border-b">
+              <tr>
+                <th className="p-4">Order ID & Date</th>
+                <th className="p-4">Customer</th>
+                <th className="p-4">Items</th>
+                <th className="p-4">Total</th>
+                <th className="p-4">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.length === 0 ? (
+                <tr><td colSpan="5" className="p-8 text-center text-gray-500 font-bold">No orders found.</td></tr>
+              ) : (
+                orders.map((o) => (
+                  <tr key={o._id} className="border-b hover:bg-gray-50">
+                    <td className="p-4">
+                      <p className="font-mono font-bold text-xs">{o._id}</p>
+                      <p className="text-gray-500 text-xs">{new Date(o.createdAt).toLocaleDateString()}</p>
+                    </td>
+                    <td className="p-4">
+                      <p className="font-bold text-gray-800">{o.customerDetails.name}</p>
+                      <p className="text-gray-500 text-xs">{o.customerDetails.phone}</p>
+                      <p className="text-gray-500 text-xs truncate max-w-[150px]">{o.customerDetails.address}</p>
+                    </td>
+                    <td className="p-4">
+                      <ul className="text-xs text-gray-600 space-y-1">
+                        {o.orderItems.map((item, idx) => (
+                          <li key={idx}>• {item.qty}x {item.name}</li>
+                        ))}
+                      </ul>
+                    </td>
+                    <td className="p-4 font-bold text-orange-600">₹{o.totalPrice}</td>
+                    <td className="p-4">
+                      {/* Dropdown to change status */}
+                      <select
+                        value={o.status}
+                        onChange={(e) => handleUpdateOrderStatus(o._id, e.target.value)}
+                        className={`p-2 rounded font-bold text-xs outline-none border cursor-pointer
+                          ${o.status === 'Processing' ? 'bg-orange-100 text-orange-700 border-orange-200' : ''}
+                          ${o.status === 'Shipped' ? 'bg-blue-100 text-blue-700 border-blue-200' : ''}
+                          ${o.status === 'Out for Delivery' ? 'bg-purple-100 text-purple-700 border-purple-200' : ''}
+                          ${o.status === 'Delivered' ? 'bg-green-100 text-green-700 border-green-200' : ''}
+                        `}
+                      >
+                        <option value="Processing">Processing</option>
+                        <option value="Shipped">Shipped</option>
+                        <option value="Out for Delivery">Out for Delivery</option>
+                        <option value="Delivered">Delivered</option>
+                      </select>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* --- TAB CONTENT: PRODUCTS LIST --- */}
       {activeTab === 'list' && (
         <div className="bg-white rounded-lg shadow overflow-x-auto border">
           <table className="w-full text-left">
@@ -183,11 +267,9 @@ export default function Admin() {
                     </button>
                   </td>
                   <td className="p-4 text-right flex justify-end gap-2">
-                    {/* EDIT BUTTON */}
                     <button onClick={() => handleEdit(p)} className="text-blue-500 hover:text-blue-700 bg-blue-50 p-2 rounded">
                       <Edit2 size={18} />
                     </button>
-                    {/* DELETE BUTTON */}
                     <button onClick={() => handleDelete(p._id)} className="text-red-500 hover:text-red-700 bg-red-50 p-2 rounded">
                       <Trash2 size={18} />
                     </button>
@@ -199,9 +281,9 @@ export default function Admin() {
         </div>
       )}
 
+      {/* --- TAB CONTENT: ADD/EDIT PRODUCT --- */}
       {activeTab === 'add' && (
          <div className="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-lg border relative">
-            {/* Cancel Edit Button */}
             {editingId && (
               <button onClick={() => { resetForm(); setActiveTab('list'); }} className="absolute top-4 right-4 text-gray-400 hover:text-red-500">
                 <X size={24} />

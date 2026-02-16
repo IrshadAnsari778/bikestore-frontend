@@ -7,6 +7,8 @@ import Products from './pages/Products';
 import Admin from './pages/Admin';
 import Cart from './pages/Cart';
 import ProductDetails from './pages/ProductDetails';
+import OrderSuccess from './pages/OrderSuccess';
+import TrackOrder from './pages/TrackOrder';
 
 export default function App() {
   const location = useLocation();
@@ -26,6 +28,9 @@ export default function App() {
           <Route path="/product/:id" element={<ProductDetails />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/cart" element={<Cart />} />
+          <Route path="/track-order" element={<TrackOrder />} />
+          {/* 👇 Here is your new Order Success Route 👇 */}
+          <Route path="/order-success/:id" element={<OrderSuccess />} />
         </Routes>
       </div>
 

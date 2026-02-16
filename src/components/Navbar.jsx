@@ -20,6 +20,7 @@ export default function Navbar() {
         <div className="hidden md:flex absolute left-1/2 transform -translate-x-1/2 gap-8">
           <Link to="/" className="hover:text-orange-500 font-medium text-lg">Home</Link>
           <Link to="/products" className="hover:text-orange-500 font-medium text-lg">All Products</Link>
+          <Link to="/track-order" className="hover:text-orange-500 font-bold transition">Track Order</Link>
         </div>
 
         {/* 3. RIGHT: Cart & Mobile Links */}

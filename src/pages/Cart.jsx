@@ -1,48 +1,91 @@
 import { useCart } from '../context/CartContext';
-import { Trash2, MessageCircle } from 'lucide-react'; // Icons
+import { Trash2, MessageCircle } from 'lucide-react'; 
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 export default function Cart() {
-  const { cart, removeFromCart, getTotalPrice } = useCart();
+  const { cart, removeFromCart, getTotalPrice, clearCart } = useCart();
+  const navigate = useNavigate(); 
   
-  // State for customer details
   const [customer, setCustomer] = useState({ name: '', address: '', phone: '' });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (e) => {
     setCustomer({ ...customer, [e.target.name]: e.target.value });
   };
 
-  // --- THE WHATSAPP LOGIC ---
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     if (!customer.name || !customer.address || !customer.phone) {
       alert("Please fill in your delivery details first!");
       return;
     }
 
-    // 1. Create the Message String
-    let message = `*🚴 New Bike Part Order!* \n\n`;
-    message += `*Customer Details:*\n`;
-    message += `Name: ${customer.name}\n`;
-    message += `Phone: ${customer.phone}\n`;
-    message += `Address: ${customer.address}\n\n`;
-    message += `*Order Summary:*\n`;
+    setIsSubmitting(true);
 
-    cart.forEach((item) => {
-      message += `- ${item.name} (x${item.qty}) - ₹${item.price * item.qty}\n`;
-    });
+    try {
+      // 1. FORMAT THE CART FOR THE DATABASE
+      // The backend Order model expects the ID to be named "product", not "_id"
+      const formattedCart = cart.map((item) => ({
+        name: item.name,
+        qty: item.qty,
+        price: item.price,
+        product: item._id, // This correctly links to the Product model in your DB
+      }));
 
-    message += `\n*💰 Total Amount: ₹${getTotalPrice()}*`;
-    message += `\n\n(I will pay via UPI/Cash upon confirmation)`;
+      // 2. SEND TO BACKEND
+      const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${backendUrl}/api/orders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          customerDetails: customer,
+          orderItems: formattedCart, // Send the newly formatted cart here
+          totalPrice: getTotalPrice(),
+        }),
+      });
 
-    // 2. Encode the message for URL
-    const encodedMessage = encodeURIComponent(message);
+      // 3. STRICT ERROR CHECK
+      // If the database fails to save it, stop and throw an error
+      if (!response.ok) {
+        throw new Error("Backend refused the order.");
+      }
 
-    // 3. Your WhatsApp Number (Replace this with your real number!)
-    const myPhoneNumber = "916360764937"; 
+      const savedOrder = await response.json();
 
-    // 4. Open WhatsApp
-    const whatsappUrl = `https://wa.me/${myPhoneNumber}?text=${encodedMessage}`;
-    window.open(whatsappUrl, '_blank');
+      // 4. CREATE THE MESSAGE STRING (Emojis removed for clean text)
+      let message = `*New Bike Part Order!* \n\n`;
+      message += `*Order ID:* ${savedOrder._id}\n`; 
+      message += `*Customer Details:*\n`;
+      message += `Name: ${customer.name}\n`;
+      message += `Phone: ${customer.phone}\n`;
+      message += `Address: ${customer.address}\n\n`;
+      message += `*Order Summary:*\n`;
+
+      cart.forEach((item) => {
+        message += `- ${item.name} (x${item.qty}) - ₹${item.price * item.qty}\n`;
+      });
+
+      message += `\n*Total Amount: ₹${getTotalPrice()}*`;
+      message += `\n\n(I will pay via UPI/Cash upon confirmation)`;
+
+      // 5. ENCODE AND OPEN WHATSAPP
+      const encodedMessage = encodeURIComponent(message);
+      const myPhoneNumber = "916360764937"; 
+      const whatsappUrl = `https://wa.me/${myPhoneNumber}?text=${encodedMessage}`;
+      window.open(whatsappUrl, '_blank');
+
+      // 6. CLEAR CART & REDIRECT
+      clearCart();
+      navigate(`/order-success/${savedOrder._id}`);
+
+    } catch (error) {
+      console.error("Error saving order:", error);
+      alert("There was an error placing your order. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (cart.length === 0) {
@@ -112,10 +155,12 @@ export default function Cart() {
 
             <button 
               onClick={handleCheckout}
-              className="w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 transition flex items-center justify-center gap-2 mt-4"
+              disabled={isSubmitting} 
+              className={`w-full text-white py-3 rounded-lg font-bold transition flex items-center justify-center gap-2 mt-4 
+                ${isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
             >
               <MessageCircle size={20} />
-              Order via WhatsApp
+              {isSubmitting ? 'Saving Order...' : 'Order via WhatsApp'}
             </button>
           </div>
         </div>
