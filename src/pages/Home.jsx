@@ -1,21 +1,20 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, CheckCircle, Truck, ShieldCheck } from 'lucide-react'; // Added icons for features
+import { ArrowRight, CheckCircle, Truck, ShieldCheck } from 'lucide-react';
 
 export default function Home() {
   return (
     <div className="min-h-screen flex flex-col">
       
       {/* --- HERO SECTION --- */}
-      {/* h-screen makes it cover the full viewing height */}
       <div className="relative h-screen flex items-center justify-center text-center text-white bg-black">
         
-        {/* Background Image */}
+        {/* Background Image - UPDATED TO LOCAL PNG */}
         <div 
           className="absolute inset-0 bg-cover bg-center opacity-60" 
-          style={{ backgroundImage: "url('https://images.unsplash.com/photo-1558981403-c5f9899a28bc?q=80&w=2070&auto=format&fit=crop')" }}
+          style={{ backgroundImage: "url('/motorcycle-bg.png')" }}
         ></div>
         
-        {/* Content (Z-Index ensures text is above the image) */}
+        {/* Content */}
         <div className="relative z-10 p-6 max-w-3xl">
           <h1 className="text-3xl md:text-5xl font-extrabold mb-4 tracking-tight drop-shadow-lg">
             Build Your Dream Machine

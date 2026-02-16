@@ -38,7 +38,7 @@ export default function Cart() {
     const encodedMessage = encodeURIComponent(message);
 
     // 3. Your WhatsApp Number (Replace this with your real number!)
-    const myPhoneNumber = "916360764967"; 
+    const myPhoneNumber = "916360764937"; 
 
     // 4. Open WhatsApp
     const whatsappUrl = `https://wa.me/${myPhoneNumber}?text=${encodedMessage}`;
